@@ -24,6 +24,8 @@ class HomeLightingApp:
             "Cochera": False
         }
 
+        self.all_lights_on = False  # Estado para todos los focos
+
         # Cargar y redimensionar la imagen de fondo usando Pillow
         try:
             self.background_image = Image.open("casa.jpg")
@@ -63,6 +65,20 @@ class HomeLightingApp:
             button = tk.Button(button_frame, text=f"Encender {room}", command=lambda r=room: self.toggle_light(r))
             button.pack()
             self.buttons[room] = button
+        
+        # Botón para encender/apagar todos los focos
+        all_button_frame = tk.Frame(self.root)
+        all_button_frame.pack(pady=5, padx=10, side=tk.LEFT)
+
+        self.all_button = tk.Button(all_button_frame, text="Encender Todos", command=self.toggle_all_lights)
+        self.all_button.pack()
+
+        # Botón para cerrar la ventana
+        exit_button_frame = tk.Frame(self.root)
+        exit_button_frame.pack(pady=5, padx=10, side=tk.LEFT)
+
+        exit_button = tk.Button(exit_button_frame, text="Cerrar", command=self.root.quit)
+        exit_button.pack()
 
     def draw_lights(self):
         self.canvas.delete("foco")  # Limpiar los focos del canvas antes de redibujar
@@ -76,13 +92,47 @@ class HomeLightingApp:
             image = self.foco_encendido_photo if self.lights[room] else self.foco_apagado_photo
             if image:
                 self.canvas.create_image(x, y, anchor="center", image=image, tags="foco")
-            self.canvas.create_text(x, y+40, tags="foco")
+            self.canvas.create_text(x, y+40, text=room, tags="foco")
 
     def toggle_light(self, room):
         self.lights[room] = not self.lights[room]
         new_state = "Apagar" if self.lights[room] else "Encender"
         self.buttons[room].config(text=f"{new_state} {room}")
         self.draw_lights()
+
+        # Enviar comando al Arduino
+        if room == "Cuarto":
+            arduino.write(b'a' if self.lights[room] else b'A')
+        elif room == "Cocina":
+            arduino.write(b's' if self.lights[room] else b'S')
+        elif room == "Sala":
+            arduino.write(b'd' if self.lights[room] else b'D')
+        elif room == "Cochera":
+            arduino.write(b'f' if self.lights[room] else b'F')
+
+    def toggle_all_lights(self):
+        self.all_lights_on = not self.all_lights_on
+        new_state = "Apagar Todos" if self.all_lights_on else "Encender Todos"
+        self.all_button.config(text=new_state)
+        
+        # Actualizar todos los focos
+        for room in self.lights:
+            self.lights[room] = self.all_lights_on
+            self.buttons[room].config(text=f"Apagar {room}" if self.all_lights_on else f"Encender {room}")
+
+        self.draw_lights()
+
+        # Enviar comando al Arduino
+        if self.all_lights_on:
+            arduino.write(b'a')
+            arduino.write(b's')
+            arduino.write(b'd')
+            arduino.write(b'f')
+        else:
+            arduino.write(b'A')
+            arduino.write(b'S')
+            arduino.write(b'D')
+            arduino.write(b'F')
 
 if __name__ == "__main__":
     root = tk.Tk()
